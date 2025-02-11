@@ -1,0 +1,36 @@
+# Configuration file for Multimodal Emotion Recognition Project
+
+# Data paths
+data:
+  eeg_path: "data/eeg_data"  # Path to the EEG data file
+  me_path: "data/me_data"        # Path to the micro-expression data directory
+  split_ratio: [0.7, 0.15, 0.15] # Train, validation, test split ratio
+
+# Model architecture
+model:
+  num_classes: 5                 # Number of emotion classes
+  feature_dim: 128               # Dimension of the feature space
+  eeg_weights: "models/eeg_feature_extractor.pth"  # Path to save/load EEG feature extractor weights
+  me_weights: "models/me_feature_extractor.pth"    # Path to save/load ME feature extractor weights
+  fusion_weights: "models/transformer_fusion.pth"  # Path to save/load fusion model weights
+
+# Training hyperparameters
+train:
+  batch_size: 32                 # Batch size for training
+  num_epochs: 50                 # Number of training epochs
+  learning_rate: 0.001           # Learning rate
+  step_size: 10                  # Step size for learning rate scheduler
+  gamma: 0.1                     # Gamma for learning rate scheduler
+  log_interval: 10               # Log interval for training loss
+
+# Logging
+logs:
+  log_dir: "logs"                # Directory to save logs and checkpoints
+
+# Evaluation
+evaluate:
+  batch_size: 32                 # Batch size for evaluation
+
+# Inference
+infer:
+  batch_size: 1                  # Batch size for inference
