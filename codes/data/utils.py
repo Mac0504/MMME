@@ -172,11 +172,6 @@ def load_checkpoint(filename, model, optimizer=None):
     return model, optimizer, epoch
 
 if __name__ == "__main__":
-    # Example of using the utility functions
-    data = np.random.rand(100, 10)
-    labels = np.random.randint(0, 3, 100)
-    subject_ids = np.random.randint(0, 10, 100)  # Example subject IDs
-
     # Normalize data
     normalized_data, scaler = normalize_data(data)
 
@@ -188,8 +183,6 @@ if __name__ == "__main__":
     for fold_idx, (train_indices, val_indices) in enumerate(folds):
         print(f"Fold {fold_idx + 1}: Train indices {train_indices}, Validation indices {val_indices}")
 
-    # Example of resampling a signal
-    signal = np.random.rand(100)
     resampled_signal = resample_signal(signal, original_length=100, new_length=80)
 
     print("Normalized data shape:", normalized_data.shape)
