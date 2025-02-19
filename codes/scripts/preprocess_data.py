@@ -10,7 +10,6 @@ def create_dir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-
 # **1. EEG Data Preprocessing**
 class EEGPreprocessor:
     def __init__(self, sampling_rate=128, filter_bands=None):
@@ -83,7 +82,84 @@ class EEGPreprocessor:
         return combined_features
 
 
-# **2. Micro-expression Data Preprocessing**
+# **2. Peripheral Signals Preprocessing (PPG, RSP, SKT, EDA, ECG)**
+class PeripheralSignalPreprocessor:
+    def __init__(self, sampling_rate=100, filter_bands=None):
+        """
+        Initialize the peripheral signal preprocessor.
+        
+        Args:
+            sampling_rate (int): Sampling rate of the peripheral signal (Hz).
+            filter_bands (list): List of filter bands, e.g., [(0.5, 4), (4, 8)].
+        """
+        self.sampling_rate = sampling_rate
+        self.filter_bands = filter_bands or [(0.5, 4), (4, 8), (8, 14)]
+        self.scaler = StandardScaler()
+
+    def bandpass_filter(self, data, lowcut, highcut):
+        """
+        Apply a bandpass filter to the peripheral signals.
+        
+        Args:
+            data (numpy.ndarray): Input signal data with shape (channels, samples).
+            lowcut (float): Low cutoff frequency.
+            highcut (float): High cutoff frequency.
+        
+        Returns:
+            numpy.ndarray: Filtered signal data.
+        """
+        nyquist = 0.5 * self.sampling_rate
+        low = lowcut / nyquist
+        high = highcut / nyquist
+        b, a = butter(4, [low, high], btype='band')
+        return lfilter(b, a, data, axis=1)
+
+    def compute_psd(self, data):
+        """
+        Compute the power spectral density (PSD) of the peripheral signals.
+        
+        Args:
+            data (numpy.ndarray): Input signal data with shape (channels, samples).
+        
+        Returns:
+            numpy.ndarray: Frequency power spectral density with shape (channels, len(freqs)).
+        """
+        psd_features = []
+        for channel_data in data:
+            freqs, psd = welch(channel_data, fs=self.sampling_rate, nperseg=256)
+            psd_features.append(psd)
+        return np.array(psd_features)
+
+    def preprocess(self, signal_data):
+        """
+        Perform the complete preprocessing pipeline on the peripheral signal data.
+        
+        Args:
+            signal_data (dict): A dictionary containing PPG, RSP, SKT, EDA, ECG signals as numpy arrays.
+        
+        Returns:
+            numpy.ndarray: Preprocessed peripheral features.
+        """
+        all_band_features = []
+        
+        # Process each signal (PPG, RSP, SKT, EDA, ECG)
+        for signal_type, data in signal_data.items():
+            band_features = []
+            for low, high in self.filter_bands:
+                filtered_data = self.bandpass_filter(data, low, high)
+                psd_features = self.compute_psd(filtered_data)
+                band_features.append(psd_features)
+            all_band_features.append(np.concatenate(band_features, axis=1))  # Concatenate band features
+        
+        # Combine features from all signal types (PPG, RSP, SKT, EDA, ECG)
+        combined_features = np.concatenate(all_band_features, axis=1)
+        
+        # Standardize
+        combined_features = self.scaler.fit_transform(combined_features)
+        return combined_features
+
+
+# **3. Micro-expression Data Preprocessing**
 class MicroExpressionPreprocessor:
     def __init__(self, image_size=(112, 112)):
         """
@@ -158,7 +234,7 @@ class MicroExpressionPreprocessor:
         }
 
 
-# **3. Data Saving and Loading**
+# **4. Data Saving and Loading**
 def save_data(data, save_path):
     """
     Save preprocessed data.
@@ -185,21 +261,27 @@ def load_data(load_path):
         return pickle.load(f)
 
 
-# **4. Main Function**
+# **5. Main Function**
 if __name__ == "__main__":
-    # Example input paths
+    
     eeg_data_path = "data/eeg_sample.npy"  # Path to EEG data
+    peripheral_data_path = "data/peripheral_signals.npy"  # Path to peripheral signal data
     onset_frame_path = "data/onset.jpg"  # Path to onset frame
     apex_frame_path = "data/apex.jpg"  # Path to apex frame
     processed_data_save_path = "processed_data.pkl"  # Path to save processed data
 
     # Create preprocessors
     eeg_processor = EEGPreprocessor()
+    peri_processor = PeripheralSignalPreprocessor()
     me_processor = MicroExpressionPreprocessor()
 
     # Load EEG data
     eeg_data = np.load(eeg_data_path)  # Assuming data shape is (channels, samples)
     eeg_features = eeg_processor.preprocess(eeg_data)
+
+    # Load peripheral signal data (PPG, RSP, SKT, EDA, ECG)
+    peripheral_data = np.load(peripheral_data_path, allow_pickle=True).item()
+    peri_features = peri_processor.preprocess(peripheral_data)
 
     # Process micro-expression data
     me_features = me_processor.preprocess(onset_frame_path, apex_frame_path)
@@ -207,6 +289,7 @@ if __name__ == "__main__":
     # Save preprocessed data
     processed_data = {
         "eeg_features": eeg_features,
+        "peri_features": peri_features,
         "me_features": me_features,
     }
     save_data(processed_data, processed_data_save_path)
