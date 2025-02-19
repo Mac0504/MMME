@@ -7,9 +7,11 @@ from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 from models.eeg_feature_extractor import EEGFeatureExtractor
 from models.me_feature_extractor import MEFeatureExtractor
+from models.peri_feature_extractor import PeriFeatureExtractor  # Import peripheral signal feature extractor
 from models.transformer_fusion import TransformerFusion
 from data.eeg_dataset import EEGDataset
 from data.me_dataset import MEDataset
+from data.peri_dataset import PeriDataset  # Import peripheral signal dataset
 from data.utils import load_data_split, create_data_loaders
 from train.loss import MultiModalLoss
 import yaml
@@ -28,7 +30,8 @@ writer = SummaryWriter(log_dir)
 # Load datasets
 eeg_dataset = EEGDataset(config['data']['eeg_path'])
 me_dataset = MEDataset(config['data']['me_path'])
-train_dataset, val_dataset, test_dataset = load_data_split(eeg_dataset, me_dataset)
+peri_dataset = PeriDataset(config['data']['peri_path'])  # Load peripheral signal dataset
+train_dataset, val_dataset, test_dataset = load_data_split(eeg_dataset, me_dataset, peri_dataset)
 
 # Create data loaders
 batch_size = config['train']['batch_size']
@@ -37,13 +40,15 @@ train_loader, val_loader, test_loader = create_data_loaders(train_dataset, val_d
 # Initialize models
 eeg_feature_extractor = EEGFeatureExtractor().to(device)
 me_feature_extractor = MEFeatureExtractor().to(device)
+peri_feature_extractor = PeriFeatureExtractor().to(device)  # Initialize peripheral signal feature extractor
 fusion_model = TransformerFusion().to(device)
 
 # Initialize loss function and optimizer
 criterion = MultiModalLoss(num_classes=config['model']['num_classes'], feature_dim=config['model']['feature_dim'])
-optimizer = optim.Adam([
+optimizer = optim.Adam([ 
     {'params': eeg_feature_extractor.parameters()},
     {'params': me_feature_extractor.parameters()},
+    {'params': peri_feature_extractor.parameters()},  # Add peripheral feature extractor to optimizer
     {'params': fusion_model.parameters()}
 ], lr=config['train']['learning_rate'])
 
@@ -68,8 +73,8 @@ def train_epoch(model, data_loader, criterion, optimizer, device, epoch):
     model.train()
     total_loss = 0.0
 
-    for batch_idx, (eeg_data, me_data, labels) in enumerate(data_loader):
-        eeg_data, me_data, labels = eeg_data.to(device), me_data.to(device), labels.to(device)
+    for batch_idx, (eeg_data, me_data, peri_data, labels) in enumerate(data_loader):
+        eeg_data, me_data, peri_data, labels = eeg_data.to(device), me_data.to(device), peri_data.to(device), labels.to(device)
 
         # Zero the gradients
         optimizer.zero_grad()
@@ -77,10 +82,11 @@ def train_epoch(model, data_loader, criterion, optimizer, device, epoch):
         # Forward pass
         eeg_features = eeg_feature_extractor(eeg_data)
         me_features = me_feature_extractor(me_data)
-        outputs = fusion_model(eeg_features, me_features)
+        peri_features = peri_feature_extractor(peri_data)  # Process peripheral signals
+        outputs = fusion_model(eeg_features, me_features, peri_features)
 
         # Compute loss
-        loss = criterion(outputs, eeg_features, me_features, labels)
+        loss = criterion(outputs, eeg_features, me_features, peri_features, labels)
 
         # Backward pass and optimize
         loss.backward()
@@ -115,16 +121,17 @@ def validate_epoch(model, data_loader, criterion, device, epoch):
     total_loss = 0.0
 
     with torch.no_grad():
-        for batch_idx, (eeg_data, me_data, labels) in enumerate(data_loader):
-            eeg_data, me_data, labels = eeg_data.to(device), me_data.to(device), labels.to(device)
+        for batch_idx, (eeg_data, me_data, peri_data, labels) in enumerate(data_loader):
+            eeg_data, me_data, peri_data, labels = eeg_data.to(device), me_data.to(device), peri_data.to(device), labels.to(device)
 
             # Forward pass
             eeg_features = eeg_feature_extractor(eeg_data)
             me_features = me_feature_extractor(me_data)
-            outputs = fusion_model(eeg_features, me_features)
+            peri_features = peri_feature_extractor(peri_data)  # Process peripheral signals
+            outputs = fusion_model(eeg_features, me_features, peri_features)
 
             # Compute loss
-            loss = criterion(outputs, eeg_features, me_features, labels)
+            loss = criterion(outputs, eeg_features, me_features, peri_features, labels)
             total_loss += loss.item()
 
     avg_loss = total_loss / len(data_loader)
