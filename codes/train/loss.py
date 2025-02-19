@@ -1,228 +1,157 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
-class CrossEntropyLoss(nn.Module):
+# Cosine Similarity
+def cosine_similarity(x1, x2):
     """
-    Standard Cross-Entropy Loss for multi-class classification tasks.
+    Compute cosine similarity between two feature sets.
+
+    Parameters:
+        - x1: First set of features
+        - x2: Second set of features
+
+    Returns:
+        - cosine_similarity: The cosine similarity between the two feature sets
     """
-    def __init__(self, weight=None, reduction='mean'):
-        """
-        Initialize the Cross-Entropy Loss.
+    return F.cosine_similarity(x1, x2, dim=-1)
 
-        Args:
-            weight (torch.Tensor, optional): Weight for each class. Default is None.
-            reduction (str, optional): Reduction method for the loss, either 'mean' or 'sum'. Default is 'mean'.
-        """
-        super(CrossEntropyLoss, self).__init__()
-        self.weight = weight
-        self.reduction = reduction
-
-    def forward(self, logits, labels):
-        """
-        Compute the Cross-Entropy Loss.
-
-        Args:
-            logits (torch.Tensor): Model output logits with shape (batch_size, num_classes).
-            labels (torch.Tensor): Ground truth labels with shape (batch_size,).
-
-        Returns:
-            torch.Tensor: Computed Cross-Entropy Loss.
-        """
-        return F.cross_entropy(logits, labels, weight=self.weight, reduction=self.reduction)
-
-
-class ContrastiveLoss(nn.Module):
+# **1. Diversity Contrast Loss (L_DCL)**
+def diversity_contrast_loss(Fm, Nm, alpha=0.5):
     """
-    Contrastive Loss for learning feature representations, ensuring that features of similar samples are closer
-    and features of dissimilar samples are farther apart.
+    Compute the Diversity Contrast Loss (L_DCL) based on the similarity between 
+    different modality feature sets.
+    
+    Parameters:
+        - Fm: Feature set (e.g., fused video features, EEG features, peripheral features)
+        - Nm: Negative feature set from another modality
+        - alpha: Margin for similarity, typically between 0 and 1
+    
+    Returns:
+        - L_DCL: The Diversity Contrast Loss
     """
-    def __init__(self, margin=1.0):
-        """
-        Initialize the Contrastive Loss.
+    # Compute cosine similarity
+    similarity = cosine_similarity(Fm, Nm)
+    # Compute the diversity contrast loss (L_DCL)
+    L_DCL = 0.5 * torch.mean(((similarity + 1) / 2 - alpha) ** 2)
+    return L_DCL
 
-        Args:
-            margin (float, optional): Minimum distance between dissimilar pairs. Default is 1.0.
-        """
-        super(ContrastiveLoss, self).__init__()
-        self.margin = margin
-
-    def forward(self, features1, features2, labels):
-        """
-        Compute the Contrastive Loss.
-
-        Args:
-            features1 (torch.Tensor): Features of the first sample with shape (batch_size, feature_dim).
-            features2 (torch.Tensor): Features of the second sample with shape (batch_size, feature_dim).
-            labels (torch.Tensor): Ground truth labels indicating whether the pairs are similar (1) or dissimilar (0),
-                                   with shape (batch_size,).
-
-        Returns:
-            torch.Tensor: Computed Contrastive Loss.
-        """
-        # Compute the Euclidean distance between the features
-        distance = F.pairwise_distance(features1, features2)
-
-        # Compute the contrastive loss
-        loss = (labels * distance.pow(2) +  # Loss for similar pairs
-                (1 - labels) * F.relu(self.margin - distance).pow(2))  # Loss for dissimilar pairs
-
-        return loss.mean()
-
-
-class CenterLoss(nn.Module):
+# **2. Consistency Contrast Loss (L_CCL)**
+def consistency_contrast_loss(Fm, Pm, alpha=0.5):
     """
-    Center Loss for learning feature representations by penalizing the distance between features and their class centers.
+    Compute the Consistency Contrast Loss (L_CCL) between two feature sets 
+    from the same modality.
+    
+    Parameters:
+        - Fm: Feature set (e.g., fused features from different modalities)
+        - Pm: Positive feature set from the same modality
+        - alpha: Margin for similarity, typically between 0 and 1
+    
+    Returns:
+        - L_CCL: The Consistency Contrast Loss
     """
-    def __init__(self, num_classes, feature_dim):
-        """
-        Initialize the Center Loss.
+    # Compute cosine similarity
+    similarity = cosine_similarity(Fm, Pm)
+    # Compute the consistency contrast loss (L_CCL)
+    L_CCL = 0.5 * torch.mean(((similarity + 1) / 2 - alpha) ** 2)
+    return L_CCL
 
-        Args:
-            num_classes (int): Number of classes.
-            feature_dim (int): Dimension of the feature space.
-        """
-        super(CenterLoss, self).__init__()
-        self.num_classes = num_classes
-        self.feature_dim = feature_dim
-        self.centers = nn.Parameter(torch.randn(num_classes, feature_dim))
-
-    def forward(self, features, labels):
-        """
-        Compute the Center Loss.
-
-        Args:
-            features (torch.Tensor): Extracted features with shape (batch_size, feature_dim).
-            labels (torch.Tensor): Ground truth labels with shape (batch_size,).
-
-        Returns:
-            torch.Tensor: Computed Center Loss.
-        """
-        # Gather the centers for each sample in the batch
-        batch_size = features.size(0)
-        centers_batch = self.centers[labels]
-
-        # Compute the squared Euclidean distance between features and their corresponding centers
-        loss = torch.sum((features - centers_batch).pow(2), dim=1).mean()
-
-        return loss
-
-
-class FocalLoss(nn.Module):
+# **3. Triplet Contrastive Loss (L_TRL)**
+def triplet_loss(Fvep, P, N, alpha=0.5):
     """
-    Focal Loss for addressing class imbalance by focusing on hard-to-classify samples.
+    Compute the Triplet Contrastive Loss (L_TRL) to push positive pairs closer 
+    and negative pairs farther apart based on cosine similarity.
+    
+    Parameters:
+        - Fvep: Fused multi-modal representation (e.g., video, EEG, peripheral features)
+        - P: Positive sample representations
+        - N: Negative sample representations
+        - alpha: Margin for similarity, typically between 0 and 1
+    
+    Returns:
+        - L_TRL: The Triplet Contrastive Loss
     """
-    def __init__(self, gamma=2.0, alpha=None, reduction='mean'):
-        """
-        Initialize the Focal Loss.
+    # Cosine similarity between the multi-modal representation and positive/negative samples
+    similarity_pos = cosine_similarity(Fvep, P)
+    similarity_neg = cosine_similarity(Fvep, N)
+    
+    # Compute the triplet contrastive loss
+    L_TRL_pos = torch.mean((1 - similarity_pos) ** 2)  # Minimize the difference for positive pairs
+    L_TRL_neg = torch.mean((similarity_neg + 1) ** 2)  # Maximize the difference for negative pairs
+    
+    # Combine positive and negative contrastive losses
+    L_TRL = alpha * (L_TRL_pos + L_TRL_neg) / 2
+    return L_TRL
 
-        Args:
-            gamma (float, optional): Focusing parameter. Default is 2.0.
-            alpha (torch.Tensor, optional): Weighting factor for each class. Default is None.
-            reduction (str, optional): Reduction method for the loss, either 'mean' or 'sum'. Default is 'mean'.
-        """
-        super(FocalLoss, self).__init__()
-        self.gamma = gamma
-        self.alpha = alpha
-        self.reduction = reduction
-
-    def forward(self, logits, labels):
-        """
-        Compute the Focal Loss.
-
-        Args:
-            logits (torch.Tensor): Model output logits with shape (batch_size, num_classes).
-            labels (torch.Tensor): Ground truth labels with shape (batch_size,).
-
-        Returns:
-            torch.Tensor: Computed Focal Loss.
-        """
-        # Compute the Cross-Entropy Loss
-        ce_loss = F.cross_entropy(logits, labels, weight=self.alpha, reduction='none')
-
-        # Compute the Focal Loss
-        pt = torch.exp(-ce_loss)
-        focal_loss = (1 - pt).pow(self.gamma) * ce_loss
-
-        if self.reduction == 'mean':
-            return focal_loss.mean()
-        elif self.reduction == 'sum':
-            return focal_loss.sum()
-        else:
-            return focal_loss
-
-
-class MultiModalLoss(nn.Module):
+# **4. Cross-Entropy Loss (L_pred)**
+def cross_entropy_loss(outputs, labels):
     """
-    Multi-Modal Loss combining Cross-Entropy Loss and Contrastive Loss for joint training.
+    Compute the cross-entropy loss for emotion classification.
+    
+    Parameters:
+        - outputs: The predicted emotion class scores (tensor of shape [batch_size, num_classes])
+        - labels: The ground truth emotion labels (tensor of shape [batch_size,])
+    
+    Returns:
+        - L_pred: The prediction loss (scalar)
     """
-    def __init__(self, num_classes, feature_dim, alpha=1.0, beta=1.0):
-        """
-        Initialize the Multi-Modal Loss.
+    # Convert labels to long format (required for nn.CrossEntropyLoss)
+    labels = labels.long()
+    
+    # Calculate the cross-entropy loss
+    L_pred = F.cross_entropy(outputs, labels)
+    return L_pred
 
-        Args:
-            num_classes (int): Number of classes.
-            feature_dim (int): Dimension of the feature space.
-            alpha (float, optional): Weight for Cross-Entropy Loss. Default is 1.0.
-            beta (float, optional): Weight for Contrastive Loss. Default is 1.0.
-        """
-        super(MultiModalLoss, self).__init__()
-        self.alpha = alpha
-        self.beta = beta
-        self.ce_loss = CrossEntropyLoss()
-        self.contrastive_loss = ContrastiveLoss()
-        self.center_loss = CenterLoss(num_classes, feature_dim)
+# **5. Total Loss Function**
+def total_loss(Fvep, P, N, outputs, labels, F_v, F_e, F_p, alpha1=0.5, alpha2=0.5, alpha3=0.5):
+    """
+    Compute the total loss, including prediction loss, diversity contrast loss, consistency contrast loss, and triplet contrast loss.
+    
+    Parameters:
+        - Fvep: Fused multi-modal features
+        - P: Positive sample representations
+        - N: Negative sample representations
+        - outputs: Predicted emotion class probabilities
+        - labels: Ground truth emotion labels
+        - F_v: Video features
+        - F_e: EEG features
+        - F_p: Peripheral features
+        - alpha1: Weight for Diversity Contrast Loss
+        - alpha2: Weight for Consistency Contrast Loss
+        - alpha3: Weight for Triplet Contrast Loss
+    
+    Returns:
+        - total_loss: The total loss combining all individual losses
+    """
+    # Calculate individual losses
+    L_pred = cross_entropy_loss(outputs, labels)
+    L_DCL_vp = diversity_contrast_loss(F_v, F_p, alpha=alpha1)  # Video vs Peripheral
+    L_DCL_ve = diversity_contrast_loss(F_v, F_e, alpha=alpha1)  # Video vs EEG
+    L_CCL_ve = consistency_contrast_loss(F_v, F_e, alpha=alpha2)  # Video vs EEG
+    L_CCL_vp = consistency_contrast_loss(F_v, F_p, alpha=alpha2)  # Video vs Peripheral
+    L_TRL = triplet_loss(Fvep, P, N, alpha=alpha3)  # Triplet loss
+    
+    # Total loss
+    total_loss = L_pred + alpha1 * (L_DCL_vp + L_DCL_ve) + alpha2 * (L_CCL_ve + L_CCL_vp) + alpha3 * L_TRL
+    return total_loss
 
-    def forward(self, logits, features1, features2, labels):
-        """
-        Compute the Multi-Modal Loss.
-
-        Args:
-            logits (torch.Tensor): Model output logits with shape (batch_size, num_classes).
-            features1 (torch.Tensor): Features of the first modality with shape (batch_size, feature_dim).
-            features2 (torch.Tensor): Features of the second modality with shape (batch_size, feature_dim).
-            labels (torch.Tensor): Ground truth labels with shape (batch_size,).
-
-        Returns:
-            torch.Tensor: Computed Multi-Modal Loss.
-        """
-        # Compute Cross-Entropy Loss
-        ce_loss = self.ce_loss(logits, labels)
-
-        # Compute Contrastive Loss
-        contrastive_loss = self.contrastive_loss(features1, features2, labels)
-
-        # Compute Center Loss
-        center_loss = self.center_loss(features1, labels)
-
-        # Combine the losses
-        total_loss = self.alpha * ce_loss + self.beta * contrastive_loss + center_loss
-
-        return total_loss
-
-
-# Example usage
 if __name__ == "__main__":
-    # Example data
-    batch_size = 16
-    num_classes = 4
-    feature_dim = 128
-
-    logits = torch.randn(batch_size, num_classes)
-    features1 = torch.randn(batch_size, feature_dim)
-    features2 = torch.randn(batch_size, feature_dim)
-    labels = torch.randint(0, num_classes, (batch_size,))
-
-    # Initialize loss functions
-    ce_loss = CrossEntropyLoss()
-    contrastive_loss = ContrastiveLoss()
-    center_loss = CenterLoss(num_classes, feature_dim)
-    focal_loss = FocalLoss()
-    multi_modal_loss = MultiModalLoss(num_classes, feature_dim)
-
-    # Compute losses
-    print("Cross-Entropy Loss:", ce_loss(logits, labels))
-    print("Contrastive Loss:", contrastive_loss(features1, features2, labels))
-    print("Center Loss:", center_loss(features1, labels))
-    print("Focal Loss:", focal_loss(logits, labels))
-    print("Multi-Modal Loss:", multi_modal_loss(logits, features1, features2, labels))
+    # Example input (replace with actual features)
+    batch_size = 2
+    input_size = 192  # Example input size, replace with actual feature size
+    hidden_size = 128  # Hidden layer size
+    num_classes = 7    # Number of emotion classes (e.g., 7 emotions: happy, sad, angry, etc.)
+    
+    # Simulating features (replace with actual feature extraction)
+    Fvep = torch.randn(batch_size, input_size)  # Example multi-modal fused features
+    P = torch.randn(batch_size, input_size)     # Positive sample features
+    N = torch.randn(batch_size, input_size)     # Negative sample features
+    outputs = torch.randn(batch_size, num_classes)  # Example outputs (predicted probabilities)
+    labels = torch.tensor([0, 1])  # Example labels: 0 -> Happy, 1 -> Sad, etc.
+    F_v = torch.randn(batch_size, input_size)
+    F_e = torch.randn(batch_size, input_size)
+    F_p = torch.randn(batch_size, input_size)
+    
+    # Calculate the total loss
+    loss = total_loss(Fvep, P, N, outputs, labels, F_v, F_e, F_p, alpha1=0.5, alpha2=0.5, alpha3=0.5)
+    
+    print("Total Loss:", loss.item())
