@@ -2,180 +2,146 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import scipy.io as sio
+import scipy.signal as signal
 
-class EEGPreprocessing:
+# Power Spectral Density (PSD) Extraction from EEG signal
+def compute_psd(eeg_data, fs=250, nperseg=256):
     """
-    Preprocessing for EEG signals, including ICA decomposition and frequency band filtering.
+    Compute the Power Spectral Density (PSD) of an EEG signal.
+    
+    Parameters:
+        - eeg_data: The EEG signal (numpy array of shape [channels, time_steps])
+        - fs: Sampling frequency (default 250 Hz)
+        - nperseg: Length of each segment for FFT computation (default 256)
+        
+    Returns:
+        - psd: The computed PSD features (numpy array of shape [channels, frequency_bins, time_steps])
     """
-    def __init__(self, sampling_rate=128, filter_bands=[(0.5, 4), (4, 8), (8, 14), (14, 30), (30, 47)]):
-        """
-        Initialize the preprocessor.
+    psd_features = []
+    for channel_data in eeg_data:
+        f, Pxx = signal.welch(channel_data, fs=fs, nperseg=nperseg)
+        psd_features.append(Pxx)
+    
+    # Stack all channels' PSD features
+    psd_features = np.array(psd_features)
+    return psd_features
 
-        Args:
-            sampling_rate (int): Sampling rate of the EEG signal.
-            filter_bands (list): List of frequency band ranges.
-        """
-        self.sampling_rate = sampling_rate
-        self.filter_bands = filter_bands
+class TCN(nn.Module):
+    def __init__(self, input_channels, output_channels, kernel_size=3, num_layers=3):
+        super(TCN, self).__init__()
+        self.num_layers = num_layers
+        
+        # Define temporal convolution layers
+        layers = []
+        for i in range(num_layers):
+            in_channels = input_channels if i == 0 else output_channels
+            layers.append(
+                nn.Conv1d(in_channels, output_channels, kernel_size=kernel_size, padding=kernel_size//2)
+            )
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(0.2))
+        
+        self.tcn = nn.Sequential(*layers)
 
-    def apply_ica(self, eeg_data):
-        """
-        Apply Independent Component Analysis (ICA) to the EEG data.
+    def forward(self, x):
+        return self.tcn(x)
 
-        Args:
-            eeg_data (np.ndarray): Input EEG data with shape (num_channels, time_steps).
-
-        Returns:
-            np.ndarray: EEG data after ICA.
-        """
-        # Placeholder for ICA implementation (use libraries like MNE or Scikit-learn).
-        return eeg_data  # Placeholder
-
-    def apply_filter_bank(self, eeg_data):
-        """
-        Apply frequency band filtering to the EEG data.
-
-        Args:
-            eeg_data (np.ndarray): Input EEG data with shape (num_channels, time_steps).
-
-        Returns:
-            np.ndarray: Filtered EEG data.
-        """
-        filtered_data = []
-        for band in self.filter_bands:
-            # Example using Butterworth filter
-            filtered = self.butter_bandpass_filter(eeg_data, band[0], band[1], self.sampling_rate)
-            filtered_data.append(filtered)
-        return np.stack(filtered_data, axis=0)
-
-    @staticmethod
-    def butter_bandpass_filter(data, lowcut, highcut, fs, order=4):
-        """
-        Apply a Butterworth bandpass filter.
-
-        Args:
-            data (np.ndarray): Input data.
-            lowcut (float): Lower cutoff frequency.
-            highcut (float): Upper cutoff frequency.
-            fs (int): Sampling rate.
-            order (int): Filter order.
-
-        Returns:
-            np.ndarray: Filtered data.
-        """
-        from scipy.signal import butter, lfilter
-        nyquist = 0.5 * fs
-        low = lowcut / nyquist
-        high = highcut / nyquist
-        b, a = butter(order, [low, high], btype='band')
-        return lfilter(b, a, data)
-
-class TemporalConvolutionalNetwork(nn.Module):
-    """
-    Temporal Convolutional Network (TCN) for extracting temporal features from EEG data.
-    """
-    def __init__(self, input_channels, hidden_channels, num_layers):
-        """
-        Initialize the TCN module.
-
-        Args:
-            input_channels (int): Number of input channels.
-            hidden_channels (int): Number of hidden channels.
-            num_layers (int): Number of residual blocks.
-        """
-        super(TemporalConvolutionalNetwork, self).__init__()
-        self.layers = nn.ModuleList()
-        for _ in range(num_layers):
-            self.layers.append(self._build_residual_block(input_channels, hidden_channels))
-
-    def _build_residual_block(self, input_channels, hidden_channels):
-        """
-        Build a single residual block.
-
-        Args:
-            input_channels (int): Number of input channels.
-            hidden_channels (int): Number of hidden channels.
-
-        Returns:
-            nn.Sequential: Residual block.
-        """
-        return nn.Sequential(
-            nn.Conv1d(input_channels, hidden_channels, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv1d(hidden_channels, input_channels, kernel_size=3, padding=1),
-            nn.ReLU()
+class NAM(nn.Module):
+    def __init__(self, channels):
+        super(NAM, self).__init__()
+        # Normalization-based Attention Module (NAM)
+        self.attention = nn.Sequential(
+            nn.Conv1d(channels, channels, kernel_size=1),
+            nn.Sigmoid()
         )
 
     def forward(self, x):
-        """
-        Forward pass.
-
-        Args:
-            x (torch.Tensor): Input tensor with shape (batch_size, input_channels, seq_length).
-
-        Returns:
-            torch.Tensor: Feature tensor.
-        """
-        for layer in self.layers:
-            x = x + layer(x)  # Residual connection
-        return x
+        attention_map = self.attention(x)
+        return x * attention_map  # Apply attention to the features
 
 class EEGFeatureExtractor(nn.Module):
-    """
-    EEG feature extraction module combining preprocessing and temporal feature extraction.
-    """
-    def __init__(self, input_channels, hidden_channels, num_layers, feature_dim):
-        """
-        Initialize the EEG feature extraction module.
-
-        Args:
-            input_channels (int): Number of input channels.
-            hidden_channels (int): Number of hidden channels.
-            num_layers (int): Number of residual blocks.
-            feature_dim (int): Output feature dimension.
-        """
+    def __init__(self, input_channels, output_channels, fs=250, nperseg=256):
         super(EEGFeatureExtractor, self).__init__()
-        self.preprocessing = EEGPreprocessing()
-        self.tcn = TemporalConvolutionalNetwork(input_channels, hidden_channels, num_layers)
-        self.fc = nn.Linear(input_channels, feature_dim)
+        # Power Spectral Density (PSD) Feature Extraction
+        self.psd_extractor = self.extract_psd
+        
+        # Temporal Convolutional Network (TCN)
+        self.tcn = TCN(input_channels, output_channels)
+        
+        # Normalization-based Attention Module (NAM)
+        self.nam = NAM(output_channels)
+
+        # PSD computation parameters
+        self.fs = fs
+        self.nperseg = nperseg
+
+    def extract_psd(self, eeg_data):
+        """
+        Extract Power Spectral Density (PSD) features from the EEG data.
+        
+        Parameters:
+            - eeg_data: The EEG signal (numpy array of shape [channels, time_steps])
+        
+        Returns:
+            - psd_features: The extracted PSD features (tensor).
+        """
+        # Compute PSD for each channel in the EEG signal
+        psd = compute_psd(eeg_data, fs=self.fs, nperseg=self.nperseg)
+        
+        # Convert PSD features to a PyTorch tensor
+        psd_tensor = torch.tensor(psd, dtype=torch.float32)
+        return psd_tensor
 
     def forward(self, eeg_data):
         """
-        Forward pass.
-
-        Args:
-            eeg_data (np.ndarray): Input EEG data with shape (batch_size, channels, seq_length).
+        Forward pass through the EEG feature extractor.
+        
+        Parameters:
+            - eeg_data: Input EEG signal (numpy array of shape [channels, time_steps])
 
         Returns:
-            torch.Tensor: Extracted feature tensor.
+            - feature_map: Extracted features after passing through TCN and NAM.
         """
-        # Preprocessing
-        batch_size, channels, seq_length = eeg_data.shape
-        preprocessed = []
-        for i in range(batch_size):
-            filtered = self.preprocessing.apply_filter_bank(eeg_data[i])
-            preprocessed.append(filtered)
-        preprocessed = np.stack(preprocessed, axis=0)  # (batch_size, freq_bands, channels, seq_length)
+        # Step 1: Extract Power Spectral Density (PSD) features from EEG data
+        psd_features = self.extract_psd(eeg_data)
 
-        # Convert to tensor
-        preprocessed = torch.tensor(preprocessed, dtype=torch.float32)
+        # Step 2: Pass the PSD features through the TCN (Temporal Convolutional Network)
+        psd_features = psd_features.unsqueeze(0)  # Add batch dimension: [1, channels, time_steps]
+        tcn_output = self.tcn(psd_features)
 
-        # TCN feature extraction
-        tcn_output = self.tcn(preprocessed.view(batch_size, -1, seq_length))
+        # Step 3: Apply NAM (Normalization-based Attention Module)
+        attention_features = self.nam(tcn_output)
+        
+        return attention_features
 
-        # Fully connected layer
-        features = self.fc(tcn_output.mean(dim=-1))
-
-        return features
+    def load_eeg_data(self, mat_file_path, eeg_key="EEG"):
+        """
+        Load EEG data from a .mat file.
+        
+        Parameters:
+            - mat_file_path: Path to the .mat file containing EEG data.
+            - eeg_key: The key under which the EEG data is stored in the .mat file.
+        
+        Returns:
+            - eeg_data: The loaded EEG signal (numpy array of shape [channels, time_steps])
+        """
+        # Load the .mat file
+        mat_data = sio.loadmat(mat_file_path)
+        
+        # Extract EEG data from the .mat file (assuming it's stored under the key `eeg_key`)
+        eeg_data = mat_data[eeg_key]
+        
+        # Return EEG data (make sure it's in the shape [channels, time_steps])
+        return eeg_data
 
 if __name__ == "__main__":
-    # Test code
-    batch_size = 4
-    channels = 32
-    seq_length = 128
-    eeg_data = np.random.rand(batch_size, channels, seq_length)
+    
+    # Load EEG data from the .mat file
+    eeg_feature_extractor = EEGFeatureExtractor(input_channels=5, output_channels=64)  # 5 channels, 64 output channels
+    eeg_data = eeg_feature_extractor.load_eeg_data(mat_file_path, eeg_key="EEG")
 
-    model = EEGFeatureExtractor(input_channels=32, hidden_channels=64, num_layers=3, feature_dim=128)
-    output = model(eeg_data)
-
-    print("Output shape:", output.shape)
+    # Forward pass through the model
+    output_features = eeg_feature_extractor(eeg_data)
+    
+    print("Extracted features shape:", output_features.shape)
