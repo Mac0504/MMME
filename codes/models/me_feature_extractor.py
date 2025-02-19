@@ -1,147 +1,121 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision import models
+import cv2
+import numpy as np
 
-class OpticalFlowExtractor:
-    """
-    Optical flow extraction module.
-    Computes optical flow between two frames and generates optical flow features.
-    """
-    def __init__(self):
-        super(OpticalFlowExtractor, self).__init__()
-        # Future: Add advanced optical flow computation methods
+# Optical Flow Extraction (using OpenCV to compute optical flow)
+def compute_optical_flow(frame1, frame2):
+    flow = cv2.calcOpticalFlowFarneback(frame1, frame2, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+    return flow
 
-    def forward(self, onset_frame, apex_frame):
-        """
-        Compute optical flow features.
-
-        Args:
-            onset_frame (torch.Tensor): Onset frame image, shape (batch_size, C, H, W)
-            apex_frame (torch.Tensor): Apex frame image, shape (batch_size, C, H, W)
-
-        Returns:
-            torch.Tensor: Optical flow features (batch_size, 2, H, W)
-        """
-        flow = apex_frame - onset_frame  # Simple optical flow approximation, can be replaced with more complex methods
-        return flow
-
-class SpatialTransformerNetwork(nn.Module):
-    """
-    Spatial Transformer Network (STN) for aligning input images.
-    """
-    def __init__(self):
-        super(SpatialTransformerNetwork, self).__init__()
+class CA_I3D(nn.Module):
+    def __init__(self, input_channels, output_channels):
+        super(CA_I3D, self).__init__()
+        # Inflated 3D Convolutions with Coordinate Attention
+        self.conv1 = nn.Conv3d(input_channels, 64, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))
+        self.conv2 = nn.Conv3d(64, 128, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))
+        self.conv3 = nn.Conv3d(128, output_channels, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))
         
-        self.localization = nn.Sequential(
-            nn.Conv2d(3, 8, kernel_size=7),
-            nn.MaxPool2d(2, 2),
-            nn.ReLU(),
-            nn.Conv2d(8, 10, kernel_size=5),
-            nn.MaxPool2d(2, 2),
-            nn.ReLU()
+        # Coordinate Attention (Placeholder for the actual logic)
+        self.coord_attention = nn.Sequential(
+            nn.Conv3d(output_channels, output_channels, kernel_size=1),
+            nn.Sigmoid()
         )
-
-        self.fc_loc = nn.Sequential(
-            nn.Linear(10 * 5 * 5, 32),
-            nn.ReLU(),
-            nn.Linear(32, 6)
-        )
-
-        self.fc_loc[2].weight.data.zero_()
-        self.fc_loc[2].bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))
 
     def forward(self, x):
-        """
-        Args:
-            x (torch.Tensor): Input image, shape (batch_size, 3, H, W)
-
-        Returns:
-            torch.Tensor: Aligned image.
-        """
-        xs = self.localization(x)
-        xs = xs.view(-1, 10 * 5 * 5)
-        theta = self.fc_loc(xs)
-        theta = theta.view(-1, 2, 3)
-
-        grid = F.affine_grid(theta, x.size())
-        x = F.grid_sample(x, grid)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+        
+        attention_map = self.coord_attention(x)  # Apply attention
+        x = x * attention_map + x  # Residual connection
         return x
 
-class MEFeatureExtractor(nn.Module):
-    """
-    Micro-expression feature extraction module.
-    Combines optical flow features and apex frame image features.
-    """
-    def __init__(self, pretrained=True):
-        super(MEFeatureExtractor, self).__init__()
-
-        # Optical flow extraction module
-        self.optical_flow_extractor = OpticalFlowExtractor()
-
-        # Spatial Transformer Network
-        self.stn = SpatialTransformerNetwork()
-
-        # Use pre-trained ResNet for apex frame feature extraction
-        self.apex_feature_extractor = models.resnet18(pretrained=pretrained)
-        self.apex_feature_extractor.fc = nn.Linear(self.apex_feature_extractor.fc.in_features, 256)
-
-        # Optical flow feature extraction
-        self.flow_feature_extractor = nn.Sequential(
-            nn.Conv2d(2, 16, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Flatten(),
-            nn.Linear(32 * 56 * 56, 256),
-            nn.ReLU()
+class NAM(nn.Module):
+    def __init__(self, channels):
+        super(NAM, self).__init__()
+        # Normalization-based Attention Module (NAM)
+        self.attention = nn.Sequential(
+            nn.Conv3d(channels, channels, kernel_size=1),
+            nn.Sigmoid()
         )
 
-        # Final fusion
-        self.fc_fusion = nn.Sequential(
-            nn.Linear(512, 128),
-            nn.ReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(128, 64),
-            nn.ReLU()
-        )
+    def forward(self, x):
+        # Apply normalization-based attention
+        attention_map = self.attention(x)
+        return x * attention_map  # Apply attention to the features
 
-    def forward(self, onset_frame, apex_frame):
-        """
-        Forward pass.
+class VideoFeatureExtractor(nn.Module):
+    def __init__(self, input_channels, output_channels):
+        super(VideoFeatureExtractor, self).__init__()
+        # Optical Flow Extraction
+        self.flow_extractor = self.extract_optical_flow
+        
+        # CA-I3D Model (Inflated 3D Convolutions with Coordinate Attention)
+        self.ca_i3d = CA_I3D(input_channels, output_channels)
+        
+        # NAM (Normalization-based Attention Module)
+        self.nam = NAM(output_channels)
 
-        Args:
-            onset_frame (torch.Tensor): Onset frame image, shape (batch_size, 3, H, W)
-            apex_frame (torch.Tensor): Apex frame image, shape (batch_size, 3, H, W)
+    def extract_optical_flow(self, video_path):
+        # Open video file using OpenCV
+        cap = cv2.VideoCapture(video_path)
+        
+        # Initialize variables
+        frames = []
+        flow_features = []
+        
+        ret, prev_frame = cap.read()
+        if not ret:
+            raise ValueError("Could not read the video file.")
+        
+        # Convert to grayscale (for optical flow calculation)
+        prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
+        
+        # Read frames and compute optical flow between consecutive frames
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            # Convert the current frame to grayscale
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            
+            # Compute optical flow between previous and current frames
+            flow = compute_optical_flow(prev_gray, gray)
+            flow_features.append(flow)
+            
+            # Set the current frame as previous for the next iteration
+            prev_gray = gray
 
-        Returns:
-            torch.Tensor: Micro-expression feature vector, shape (batch_size, 64)
-        """
-        # Optical flow features
-        flow = self.optical_flow_extractor(onset_frame, apex_frame)
-        flow_features = self.flow_feature_extractor(flow)
+        cap.release()
+        
+        # Convert list of flow features into a tensor (shape: [num_frames, height, width, 2])
+        flow_features = np.array(flow_features)
+        flow_features = torch.tensor(flow_features, dtype=torch.float32)
+        
+        return flow_features
 
-        # Spatial transformation and apex frame feature extraction
-        aligned_apex = self.stn(apex_frame)
-        apex_features = self.apex_feature_extractor(aligned_apex)
+    def forward(self, video_path):
+        # Step 1: Extract optical flow from the video
+        optical_flow = self.extract_optical_flow(video_path)
 
-        # Feature fusion
-        combined_features = torch.cat((flow_features, apex_features), dim=1)
-        final_features = self.fc_fusion(combined_features)
+        # Step 2: Pass the optical flow features through the CA-I3D model
+        flow_features = self.ca_i3d(optical_flow)
+        
+        # Step 3: Apply NAM (Normalization-based Attention Module)
+        features_with_attention = self.nam(flow_features)
+        
+        return features_with_attention
 
-        return final_features
 
 if __name__ == "__main__":
-    # Test code
-    batch_size = 8
-    channels, height, width = 3, 224, 224
-
-    onset_frame = torch.rand(batch_size, channels, height, width)
-    apex_frame = torch.rand(batch_size, channels, height, width)
-
-    model = MEFeatureExtractor(pretrained=False)
-    features = model(onset_frame, apex_frame)
-
-    print("Output shape:", features.shape)
+  
+    # Create VideoFeatureExtractor instance
+    model = VideoFeatureExtractor(input_channels=3, output_channels=128)  # RGB input (3 channels), 128 output channels
+    
+    # Forward pass
+    output_features = model(video_path)
+    
+    print("Extracted features shape:", output_features.shape)
