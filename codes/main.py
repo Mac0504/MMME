@@ -3,9 +3,11 @@ import argparse
 import yaml
 from data.eeg_dataset import EEGDataset
 from data.me_dataset import MEDataset
+from data.peri_dataset import PeriDataset  # Import peripheral signal dataset
 from data.utils import load_data_split, create_data_loaders
 from models.eeg_feature_extractor import EEGFeatureExtractor
 from models.me_feature_extractor import MEFeatureExtractor
+from models.peri_feature_extractor import PeriFeatureExtractor  # Import peripheral signal feature extractor
 from models.transformer_fusion import TransformerFusion
 from train.train import train_epoch, validate_epoch, save_checkpoint
 from train.loss import MultiModalLoss
@@ -58,7 +60,8 @@ def main():
     # Load datasets
     eeg_dataset = EEGDataset(config['data']['eeg_path'])
     me_dataset = MEDataset(config['data']['me_path'])
-    train_dataset, val_dataset, test_dataset = load_data_split(eeg_dataset, me_dataset)
+    peri_dataset = PeriDataset(config['data']['peri_path'])  # Load peripheral signal dataset
+    train_dataset, val_dataset, test_dataset = load_data_split(eeg_dataset, me_dataset, peri_dataset)
 
     # Create data loaders
     batch_size = config['train']['batch_size']
@@ -67,13 +70,15 @@ def main():
     # Initialize models
     eeg_feature_extractor = EEGFeatureExtractor().to(device)
     me_feature_extractor = MEFeatureExtractor().to(device)
+    peri_feature_extractor = PeriFeatureExtractor().to(device)  # Initialize peripheral signal feature extractor
     fusion_model = TransformerFusion().to(device)
 
     # Initialize loss function and optimizer
     criterion = MultiModalLoss(num_classes=config['model']['num_classes'], feature_dim=config['model']['feature_dim'])
-    optimizer = optim.Adam([
+    optimizer = optim.Adam([ 
         {'params': eeg_feature_extractor.parameters()},
         {'params': me_feature_extractor.parameters()},
+        {'params': peri_feature_extractor.parameters()},  # Add peripheral feature extractor to optimizer
         {'params': fusion_model.parameters()}
     ], lr=config['train']['learning_rate'])
 
@@ -145,13 +150,14 @@ def main():
         # Perform inference (example with a single batch)
         fusion_model.eval()
         with torch.no_grad():
-            for batch_idx, (eeg_data, me_data, labels) in enumerate(test_loader):
-                eeg_data, me_data, labels = eeg_data.to(device), me_data.to(device), labels.to(device)
+            for batch_idx, (eeg_data, me_data, peri_data, labels) in enumerate(test_loader):
+                eeg_data, me_data, peri_data, labels = eeg_data.to(device), me_data.to(device), peri_data.to(device), labels.to(device)
 
                 # Forward pass
                 eeg_features = eeg_feature_extractor(eeg_data)
                 me_features = me_feature_extractor(me_data)
-                outputs = fusion_model(eeg_features, me_features)
+                peri_features = peri_feature_extractor(peri_data)  # Process peripheral signals
+                outputs = fusion_model(eeg_features, me_features, peri_features)
 
                 # Print predictions
                 _, preds = torch.max(outputs, 1)
