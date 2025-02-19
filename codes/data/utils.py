@@ -171,7 +171,6 @@ def load_checkpoint(filename, model, optimizer=None):
     epoch = checkpoint['epoch']
     return model, optimizer, epoch
 
-# Example usage
 if __name__ == "__main__":
     # Example of using the utility functions
     data = np.random.rand(100, 10)
