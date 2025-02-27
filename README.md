@@ -31,6 +31,6 @@ After preprocessing and feature extraction of MEs, we employed several typical M
 
 ![image](pictures/pic3.png)
 
-# How to get
+%# How to get
 
-This database is publicly available for any academic use. To obtain it, please sign the release agreement and send a scanned copy to ustb_machuang@163.com.
+%This database is publicly available for any academic use. To obtain it, please sign the release agreement and send a scanned copy to ustb_machuang@163.com.
