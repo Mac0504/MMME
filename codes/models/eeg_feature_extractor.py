@@ -139,6 +139,7 @@ if __name__ == "__main__":
     
     # Load EEG data from the .mat file
     eeg_feature_extractor = EEGFeatureExtractor(input_channels=5, output_channels=64)  # 5 channels, 64 output channels
+    mat_file_path = r'./data/EEG/eeg_data.mat'
     eeg_data = eeg_feature_extractor.load_eeg_data(mat_file_path, eeg_key="EEG")
 
     # Forward pass through the model
