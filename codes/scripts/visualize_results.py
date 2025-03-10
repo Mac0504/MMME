@@ -24,8 +24,8 @@ with open('configs/config.yaml', 'r') as f:
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Load datasets
-eeg_dataset = EEGDataset(config['data']['eeg_path'])
-me_dataset = MEDataset(config['data']['me_path'])
+eeg_dataset = EEGDataset(config['data']['EEG'])
+me_dataset = MEDataset(config['data']['MEs'])
 train_loader, val_loader, test_loader = load_data_split(eeg_dataset, me_dataset, config['data']['split_ratio'])
 
 # Load models
