@@ -47,7 +47,7 @@ class PeriDataset(Dataset):
         # Process the signal data
         signal_tensor = self.process_signal(signal)
         
-        # Apply transformation if any (e.g., normalization)
+        # Apply transformation
         if self.transform:
             signal_tensor = self.transform(signal_tensor)
 
@@ -66,7 +66,7 @@ class PeriDataset(Dataset):
         # Here we assume the data is in .mat format (can be modified for other formats)
         data = loadmat(path)
         
-        # Assume the signal data is stored under the key 'signal_data' in the .mat file
+        # The signal data is stored under the key 'signal_data' in the .mat file
         signal = data['signal_data']
         
         # Return the signal data
@@ -122,20 +122,16 @@ class PeriDataset(Dataset):
 
 
 if __name__ == "__main__":
-    data_paths = ["./data/peri_signal1.mat", "./data/peri_signal2.mat"]  # File paths for peripheral physiological signals
-    labels = [0, 1]  # Example labels, 0 for happy, 1 for sad
+    # Load dataset
+    peri_dataset = PeriDataset(config['data']['PERI'])
 
-    # Create dataset object
-    dataset = PeriDataset(data_paths, labels)
+    # Split dataset
+    train_dataset, val_dataset, test_dataset = load_data_split(peri_dataset)
 
-    # Get the first sample
-    signal_tensor, label = dataset[0]
-    print("Signal tensor shape:", signal_tensor.shape)  # Should print (C, T)
-    print("Label:", label)
+    # Create data loaders
+    train_loader, val_loader, test_loader = create_data_loaders(train_dataset, val_dataset, test_dataset)
 
-    # Create a DataLoader
-    from torch.utils.data import DataLoader
-    dataloader = DataLoader(dataset, batch_size=2, collate_fn=dataset.collate_fn)
-    for batch_signals, batch_labels in dataloader:
-        print("Batch signals shape:", batch_signals.shape)
-        print("Batch labels:", batch_labels)
+    for batch_idx, (data, labels) in enumerate(train_loader):
+        print(f"Batch {batch_idx}, Data shape: {data.shape}, Labels: {labels}")
+        if batch_idx == 2:  # Just print the first few batches
+            break
