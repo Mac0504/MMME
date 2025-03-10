@@ -264,19 +264,15 @@ def load_data(load_path):
 # **5. Main Function**
 if __name__ == "__main__":
     
-    eeg_data_path = "data/eeg_sample.npy"  # Path to EEG data
-    peripheral_data_path = "data/peripheral_signals.npy"  # Path to peripheral signal data
-    onset_frame_path = "data/onset.jpg"  # Path to onset frame
-    apex_frame_path = "data/apex.jpg"  # Path to apex frame
-    processed_data_save_path = "processed_data.pkl"  # Path to save processed data
-
     # Create preprocessors
     eeg_processor = EEGPreprocessor()
     peri_processor = PeripheralSignalPreprocessor()
     me_processor = MicroExpressionPreprocessor()
 
     # Load EEG data
-    eeg_data = np.load(eeg_data_path)  # Assuming data shape is (channels, samples)
+    mat_data = scipy.io.loadmat('./data/eeg/eeg_data.mat')
+    eeg_data = mat_data['eeg_data']
+    eeg_data = eeg_data.astype(np.float32)
     eeg_features = eeg_processor.preprocess(eeg_data)
 
     # Load peripheral signal data (PPG, RSP, SKT, EDA, ECG)
