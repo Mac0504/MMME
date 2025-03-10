@@ -122,7 +122,6 @@ class PeriDataset(Dataset):
 
 
 if __name__ == "__main__":
-    # Example data paths and labels
     data_paths = ["./data/peri_signal1.mat", "./data/peri_signal2.mat"]  # File paths for peripheral physiological signals
     labels = [0, 1]  # Example labels, 0 for happy, 1 for sad
 
