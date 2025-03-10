@@ -7,9 +7,11 @@ import seaborn as sns
 from torch.utils.data import DataLoader
 from models.eeg_feature_extractor import EEGFeatureExtractor
 from models.me_feature_extractor import MEFeatureExtractor
+from models.peri_feature_extractor import PeriFeatureExtractor
 from models.transformer_fusion import TransformerFusion
 from data.eeg_dataset import EEGDataset
 from data.me_dataset import MEDataset
+from data.peri_dataset import PeriDataset  # Import peripheral signal dataset
 from data.utils import load_data_split, create_data_loaders
 import yaml
 
@@ -21,9 +23,10 @@ with open('../configs/config.yaml', 'r') as f:
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Load datasets
-eeg_dataset = EEGDataset(config['data']['eeg_path'])
-me_dataset = MEDataset(config['data']['me_path'])
-train_dataset, val_dataset, test_dataset = load_data_split(eeg_dataset, me_dataset)
+eeg_dataset = EEGDataset(config['data'][r'./data/EEG'])
+me_dataset = MEDataset(config['data'][r'./data/MEs'])
+peri_dataset = PeriDataset(config['data'][r'./data/PERI'])  # Load peripheral signal dataset
+train_dataset, val_dataset, test_dataset = load_data_split(eeg_dataset, me_dataset, peri_dataset)
 
 # Create data loaders
 batch_size = config['train']['batch_size']
@@ -32,11 +35,13 @@ test_loader = create_data_loaders(train_dataset, val_dataset, test_dataset, batc
 # Load models
 eeg_feature_extractor = EEGFeatureExtractor().to(device)
 me_feature_extractor = MEFeatureExtractor().to(device)
+peri_feature_extractor = PeriFeatureExtractor().to(device)  # Initialize peripheral signal feature extractor
 fusion_model = TransformerFusion().to(device)
 
 # Load trained weights
 eeg_feature_extractor.load_state_dict(torch.load(config['model']['eeg_weights']))
 me_feature_extractor.load_state_dict(torch.load(config['model']['me_weights']))
+peri_feature_extractor.load_state_dict(torch.load(config['model']['peri_weights']))  # Load peripheral feature extractor weights
 fusion_model.load_state_dict(torch.load(config['model']['fusion_weights']))
 
 def evaluate_model(model, data_loader):
@@ -56,15 +61,16 @@ def evaluate_model(model, data_loader):
     all_probs = []
 
     with torch.no_grad():
-        for eeg_data, me_data, labels in data_loader:
-            eeg_data, me_data, labels = eeg_data.to(device), me_data.to(device), labels.to(device)
+        for eeg_data, me_data, peri_data, labels in data_loader:
+            eeg_data, me_data, peri_data, labels = eeg_data.to(device), me_data.to(device), peri_data.to(device), labels.to(device)
 
             # Extract features
             eeg_features = eeg_feature_extractor(eeg_data)
             me_features = me_feature_extractor(me_data)
+            peri_features = peri_feature_extractor(peri_data)
 
             # Fusion and classification
-            outputs = fusion_model(eeg_features, me_features)
+            outputs = fusion_model(eeg_features, me_features, peri_features)
             probs = torch.softmax(outputs, dim=1)
             _, preds = torch.max(outputs, 1)
 
@@ -132,7 +138,8 @@ def plot_roc_curve(all_labels, all_probs, class_names):
 
     # Plot all ROC curves
     plt.figure(figsize=(10, 8))
-    colors = ['blue', 'red', 'green', 'orange']
+    colors = ['blue', 'red', 'green']
+    # colors = ['blue', 'red', 'green', 'orange', 'gray', 'purple', 'yellow']
     for i, color in zip(range(len(class_names)), colors):
         plt.plot(fpr[i], tpr[i], color=color, lw=2,
                  label=f'ROC curve of class {class_names[i]} (area = {roc_auc[i]:.2f})')
@@ -156,7 +163,8 @@ def main():
     print(f"ROC AUC: {metrics['roc_auc']:.4f}")
 
     # Plot confusion matrix
-    class_names = ['Happy', 'Sad', 'Angry', 'Neutral']
+    class_names = ['Neg', 'Pos', 'Sur']
+    # class_names = ['Hap', 'Sur', 'Sad', 'Fea', 'Ang', 'Dis', 'Con']
     plot_confusion_matrix(metrics['confusion_matrix'], class_names)
 
     # Plot ROC curve
