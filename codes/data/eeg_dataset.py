@@ -134,7 +134,7 @@ def create_data_loaders(train_dataset, val_dataset, test_dataset, batch_size=32,
 # Example usage
 if __name__ == "__main__":
     # Load dataset
-    eeg_dataset = EEGDataset(config['data']['eeg_path'])
+    eeg_dataset = EEGDataset(config['data']['EEG'])
 
     # Split dataset
     train_dataset, val_dataset, test_dataset = load_data_split(eeg_dataset)
