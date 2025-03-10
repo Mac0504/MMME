@@ -70,7 +70,8 @@ def plot_confusion_matrix(y_true, y_pred, classes, normalize=False, title='Confu
     plt.show()
 
 # Plot confusion matrix
-class_names = ['Happy', 'Sad', 'Fear', 'Surprise', 'Disgust']
+class_names = ['Neg', 'Pos', 'Sur']
+    # class_names = ['Hap', 'Sur', 'Sad', 'Fea', 'Ang', 'Dis', 'Con']
 plot_confusion_matrix(test_labels, test_preds, classes=class_names, normalize=True)
 
 # Function to plot ROC curve
@@ -83,7 +84,8 @@ def plot_roc_curve(y_true, y_pred, n_classes):
     for i in range(n_classes):
         fpr[i], tpr[i], _ = roc_curve(y_true[:, i], y_pred[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
-    colors = cycle(['blue', 'red', 'green', 'orange'])
+    colors = ['blue', 'red', 'green']
+    # colors = ['blue', 'red', 'green', 'orange', 'gray', 'purple', 'yellow']
     for i, color in zip(range(n_classes), colors):
         plt.plot(fpr[i], tpr[i], color=color, lw=2, label=f'ROC curve of class {i} (area = {roc_auc[i]:.2f})')
     plt.plot([0, 1], [0, 1], 'k--', lw=2)
@@ -104,7 +106,8 @@ def plot_precision_recall_curve(y_true, y_pred, n_classes):
     recall = dict()
     for i in range(n_classes):
         precision[i], recall[i], _ = precision_recall_curve(y_true[:, i], y_pred[:, i])
-    colors = cycle(['blue', 'red', 'green', 'orange'])
+    colors = ['blue', 'red', 'green']
+    # colors = ['blue', 'red', 'green', 'orange', 'gray', 'purple', 'yellow']
     for i, color in zip(range(n_classes), colors):
         plt.plot(recall[i], precision[i], color=color, lw=2, label=f'Precision-Recall curve of class {i}')
     plt.xlabel('Recall')
