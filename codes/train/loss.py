@@ -133,25 +133,3 @@ def total_loss(Fvep, P, N, outputs, labels, F_v, F_e, F_p, alpha1=0.5, alpha2=0.
     # Total loss
     total_loss = L_pred + alpha1 * (L_DCL_vp + L_DCL_ve) + alpha2 * (L_CCL_ve + L_CCL_vp) + alpha3 * L_TRL
     return total_loss
-
-if __name__ == "__main__":
-    # Example input (replace with actual features)
-    batch_size = 2
-    input_size = 192  # Example input size, replace with actual feature size
-    hidden_size = 128  # Hidden layer size
-    num_classes = 7    # Number of emotion classes (e.g., 7 emotions: happy, sad, angry, etc.)
-    
-    # Simulating features (replace with actual feature extraction)
-    Fvep = torch.randn(batch_size, input_size)  # Example multi-modal fused features
-    P = torch.randn(batch_size, input_size)     # Positive sample features
-    N = torch.randn(batch_size, input_size)     # Negative sample features
-    outputs = torch.randn(batch_size, num_classes)  # Example outputs (predicted probabilities)
-    labels = torch.tensor([0, 1])  # Example labels: 0 -> Happy, 1 -> Sad, etc.
-    F_v = torch.randn(batch_size, input_size)
-    F_e = torch.randn(batch_size, input_size)
-    F_p = torch.randn(batch_size, input_size)
-    
-    # Calculate the total loss
-    loss = total_loss(Fvep, P, N, outputs, labels, F_v, F_e, F_p, alpha1=0.5, alpha2=0.5, alpha3=0.5)
-    
-    print("Total Loss:", loss.item())
