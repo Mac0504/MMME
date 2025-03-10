@@ -270,7 +270,7 @@ if __name__ == "__main__":
     me_processor = MicroExpressionPreprocessor()
 
     # Load EEG data
-    mat_data = scipy.io.loadmat('./data/eeg/eeg_data.mat')
+    mat_data = scipy.io.loadmat(r'./data/EEG/eeg_data.mat')
     eeg_data = mat_data['eeg_data']
     eeg_data = eeg_data.astype(np.float32)
     eeg_features = eeg_processor.preprocess(eeg_data)
@@ -280,7 +280,7 @@ if __name__ == "__main__":
     peri_features = peri_processor.preprocess(peripheral_data)
 
     # Process micro-expression data
-    me_features = me_processor.preprocess(onset_frame_path, apex_frame_path)
+    me_features = me_processor.preprocess(r'./data/MEs/video_angry_liyan20230802_116_1.70_1.97_2.20_143.avi')
 
     # Save preprocessed data
     processed_data = {
