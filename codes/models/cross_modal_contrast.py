@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 # Multihead Attention Layer
 class MultiheadAttentionLayer(nn.Module):
@@ -121,9 +122,9 @@ if __name__ == "__main__":
     seq_len = 10
     embed_size = 64
     
-    F_v = torch.randn(batch_size, seq_len, embed_size)  # Video features
-    F_e = torch.randn(batch_size, seq_len, embed_size)  # EEG features
-    F_p = torch.randn(batch_size, seq_len, embed_size)  # Peripheral features
+    F_v = np.load(r"..data/MEs/me_data.npy")  # Video features
+    F_e = np.load(r"..data/EEG/eeg_data.npy")  # EEG features
+    F_p = np.load(r"..data/PERI/peri_data.npy")  # Peripheral features
     
     # Create the CrossModalContrastiveLearning module
     model = CrossModalContrastiveLearning(embed_size=embed_size, num_heads=4, alpha=0.5)
