@@ -92,6 +92,7 @@ if __name__ == "__main__":
     model = PeriFeatureExtractor(input_size=1, hidden_size=64, output_size=64)  # 1 input channel, 64 hidden size
     
     # Load the peripheral signal data (PPG, RSP, SKT, EDA, ECG)
+    file_path = r'./data/PERI/peri.csv'
     peri_data = model.load_data(file_path)
     
     # Add batch dimension: [batch_size, seq_len, input_size]
