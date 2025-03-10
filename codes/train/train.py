@@ -2,7 +2,7 @@ import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 from models.eeg_feature_extractor import EEGFeatureExtractor
@@ -15,6 +15,8 @@ from data.peri_dataset import PeriDataset  # Import peripheral signal dataset
 from data.utils import load_data_split, create_data_loaders
 from train.loss import MultiModalLoss
 import yaml
+import numpy as np
+from sklearn.model_selection import LeaveOneGroupOut
 
 # Load configuration
 with open('../configs/config.yaml', 'r') as f:
@@ -31,11 +33,13 @@ writer = SummaryWriter(log_dir)
 eeg_dataset = EEGDataset(config['data']['eeg_path'])
 me_dataset = MEDataset(config['data']['me_path'])
 peri_dataset = PeriDataset(config['data']['peri_path'])  # Load peripheral signal dataset
-train_dataset, val_dataset, test_dataset = load_data_split(eeg_dataset, me_dataset, peri_dataset)
 
-# Create data loaders
-batch_size = config['train']['batch_size']
-train_loader, val_loader, test_loader = create_data_loaders(train_dataset, val_dataset, test_dataset, batch_size=batch_size)
+# Assuming that the dataset has a method to get subject IDs
+# For example, eeg_dataset.get_subject_ids() returns a list of subject IDs for each sample
+subject_ids = eeg_dataset.get_subject_ids()  # This should be a list of subject IDs corresponding to each sample
+
+# Initialize LOSO cross-validator
+logo = LeaveOneGroupOut()
 
 # Initialize models
 eeg_feature_extractor = EEGFeatureExtractor().to(device)
@@ -157,27 +161,39 @@ def save_checkpoint(model, optimizer, epoch, save_path):
 
 def main():
     """
-    Main function to train the model.
+    Main function to train the model with LOSO validation.
     """
     best_val_loss = float('inf')
 
-    for epoch in range(1, config['train']['num_epochs'] + 1):
-        # Train for one epoch
-        train_loss = train_epoch(fusion_model, train_loader, criterion, optimizer, device, epoch)
+    # Perform LOSO cross-validation
+    for fold, (train_idx, val_idx) in enumerate(logo.split(np.arange(len(eeg_dataset)), groups=subject_ids)):
+        print(f"Starting Fold {fold + 1}")
 
-        # Validate for one epoch
-        val_loss = validate_epoch(fusion_model, val_loader, criterion, device, epoch)
+        # Create subsets for the current fold
+        train_subset = Subset(eeg_dataset, train_idx)
+        val_subset = Subset(eeg_dataset, val_idx)
 
-        # Step the learning rate scheduler
-        scheduler.step()
+        # Create data loaders for the current fold
+        train_loader = DataLoader(train_subset, batch_size=config['train']['batch_size'], shuffle=True)
+        val_loader = DataLoader(val_subset, batch_size=config['train']['batch_size'], shuffle=False)
 
-        # Save the model checkpoint if it's the best so far
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            save_checkpoint(fusion_model, optimizer, epoch, os.path.join(log_dir, 'best_model.pth'))
+        for epoch in range(1, config['train']['num_epochs'] + 1):
+            # Train for one epoch
+            train_loss = train_epoch(fusion_model, train_loader, criterion, optimizer, device, epoch)
 
-        # Save the latest model checkpoint
-        save_checkpoint(fusion_model, optimizer, epoch, os.path.join(log_dir, 'latest_model.pth'))
+            # Validate for one epoch
+            val_loss = validate_epoch(fusion_model, val_loader, criterion, device, epoch)
+
+            # Step the learning rate scheduler
+            scheduler.step()
+
+            # Save the model checkpoint if it's the best so far
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                save_checkpoint(fusion_model, optimizer, epoch, os.path.join(log_dir, f'best_model_fold_{fold + 1}.pth'))
+
+            # Save the latest model checkpoint
+            save_checkpoint(fusion_model, optimizer, epoch, os.path.join(log_dir, f'latest_model_fold_{fold + 1}.pth'))
 
     # Close the TensorBoard writer
     writer.close()
