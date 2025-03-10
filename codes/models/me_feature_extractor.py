@@ -116,6 +116,7 @@ if __name__ == "__main__":
     model = VideoFeatureExtractor(input_channels=3, output_channels=128)  # RGB input (3 channels), 128 output channels
     
     # Forward pass
+    video_path = r'./data/MEs/video_angry_wangshuai20230802_142_17.51_17.67_17.97_142.avi'
     output_features = model(video_path)
     
     print("Extracted features shape:", output_features.shape)
