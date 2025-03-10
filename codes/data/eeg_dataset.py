@@ -142,7 +142,6 @@ if __name__ == "__main__":
     # Create data loaders
     train_loader, val_loader, test_loader = create_data_loaders(train_dataset, val_dataset, test_dataset)
 
-    # Example of iterating through the data loader
     for batch_idx, (data, labels) in enumerate(train_loader):
         print(f"Batch {batch_idx}, Data shape: {data.shape}, Labels: {labels}")
         if batch_idx == 2:  # Just print the first few batches
