@@ -129,7 +129,7 @@ if __name__ == "__main__":
     ])
 
     # Load dataset
-    me_dataset = MEDataset(config['data']['me_path'], transform=transform, augment=True)
+    me_dataset = MEDataset(config['data']['MEs'], transform=transform, augment=True)
 
     # Split dataset
     train_dataset, val_dataset, test_dataset = load_data_split(me_dataset)
