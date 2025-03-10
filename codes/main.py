@@ -147,7 +147,6 @@ def main():
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch']
 
-        # Perform inference (example with a single batch)
         fusion_model.eval()
         with torch.no_grad():
             for batch_idx, (eeg_data, me_data, peri_data, labels) in enumerate(test_loader):
