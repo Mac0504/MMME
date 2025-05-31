@@ -26,3 +26,5 @@ The following animated images are samples of micro-expressions labeled with each
 ![image](samples-1.gif)
 
 ![image](samples-2.gif)
+
+# To apply for access to this dataset, please download the Release Agreement.pdf file, print it, fill in the required information by hand, and email a scanned copy to ustb_machuang@163.com.
