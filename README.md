@@ -10,7 +10,19 @@ The experimental setup, as illustrated in the left panel of Fig. 1, was conducte
 
 ![image](pictures/Experiment.jpg)
 
-# Samples
+The list of AU codes involved in MEs in the MMME dataset, along with their corresponding action descriptions, occurrence regions, and counts is shown in Table 1.
+
+![image](pictures/Table1.jpg)
+
+In this section, we perform a statistical analysis of the annotated samples. The results, presented in Fig. 2, highlight four key characteristics: (a) the distribution of seven basic discrete emotions; (b) the distribution of three composite emotions (``Negative,'' ``Positive,'' and ``Surprise''); (c) the dataset size and participant gender composition; and (d) a comparison of mean ME durations and their standard deviations across benchmark datasets. 
+
+![image](pictures/Data distribution.jpg)
+
+# Samples of micro-expressions labeled with each emotion
+
+The following animated images are samples of micro-expressions labeled with each emotion:
+
+
 ![image](samples-1.gif)
 
 ![image](samples-2.gif)
