@@ -6,9 +6,9 @@ Micro-expressions (MEs) are subtle, fleeting nonverbal cues that reveal an indiv
 
 # Experimental setup and signal examples of the MMME dataset acquisition system
 
-The experimental setup, as illustrated in the left panel of Fig. \ref{fig:fig-Experiment}, was conducted in a controlled environment. To eliminate 50 Hz AC-induced flickering, we implemented a specialized lighting system consisting of three 600-watt DC-powered LED lights equipped with umbrella reflectors. These lights were strategically positioned to focus illumination on the participant's face, ensuring consistent and high-intensity lighting conditions. Specifically, the lighting configuration comprised one central light positioned directly in front of the participant and two additional lights placed at 45 angles to the left and right of the participant. Participants were seated one meter from the main display monitor, with a green background panel positioned behind them to facilitate subsequent facial image processing.
+The experimental setup, as illustrated in the left panel of Fig. 1, was conducted in a controlled environment. To eliminate 50 Hz AC-induced flickering, we implemented a specialized lighting system consisting of three 600-watt DC-powered LED lights equipped with umbrella reflectors. These lights were strategically positioned to focus illumination on the participant's face, ensuring consistent and high-intensity lighting conditions. Specifically, the lighting configuration comprised one central light positioned directly in front of the participant and two additional lights placed at 45 angles to the left and right of the participant. Participants were seated one meter from the main display monitor, with a green background panel positioned behind them to facilitate subsequent facial image processing.
 
-![image](pictures/Experiment.png)
+![image](pictures/Experiment.jpg)
 
 # Samples
 ![image](samples-1.gif)
