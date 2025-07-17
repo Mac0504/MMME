@@ -31,7 +31,7 @@ The following animated images are samples of micro-expressions labeled with each
 
 The image below illustrates the data structure of a multimodal micro-expression dataset:
 
-![image](pictures/Data Structure.jpg)
+![image](pictures/Data_Structure.jpg)
 
 # How to Apply for the Dataset
 
