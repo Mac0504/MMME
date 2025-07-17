@@ -23,9 +23,15 @@ In this section, we perform a statistical analysis of the annotated samples. The
 The following animated images are samples of micro-expressions labeled with each emotion:
 
 
-![image](samples-1.gif)
+![image](pictures/samples-1.gif)
 
-![image](samples-2.gif)
+![image](pictures/samples-2.gif)
+
+# Data structure
+
+The image below illustrates the data structure of a multimodal micro-expression dataset:
+
+![image](pictures/Data Structure.jpg)
 
 # How to Apply for the Dataset
 
