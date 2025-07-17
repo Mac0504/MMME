@@ -27,6 +27,12 @@ The following animated images are samples of micro-expressions labeled with each
 
 ![image](pictures/samples-2.gif)
 
+# Experimental equipment description
+
+The Experimental equipment description and data synchronization mechanism are shown in the figure below:
+
+![image](pictures/Experimental_equipment_description.jpg)
+
 # Data structure
 
 The image below illustrates the data structure of a multimodal micro-expression dataset:
