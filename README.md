@@ -45,6 +45,6 @@ The dataset annotation file is shown in the figure below:
 
 ![image](pictures/coding_file.jpg)
 
-# How to Apply for the Dataset
+% # How to Apply for the Dataset
 
-To apply for this dataset, please download the "Release Agreement.pdf" file, print it, fill in the required information by hand, and send the scanned copy to the email address: ustb_machuang@163.com.
+% To apply for this dataset, please download the "Release Agreement.pdf" file, print it, fill in the required information by hand, and send the scanned copy to the email address: ustb_machuang@163.com.
